@@ -1,0 +1,827 @@
+%% ============================================================
+%%  Informe Técnico Final — Proyecto de Bases de Datos
+%%  Análisis de Potencial Solar en Territorios PDET - Colombia
+%%  UPME / Unidad de Planeación Minero Energética
+%% ============================================================
+\documentclass[12pt, a4paper]{report}
+
+%% ─── Paquetes ───────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% Márgenes y geometría
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm]{geometry}
+
+% Colores y gráficos
+\usepackage[dvipsnames, table]{xcolor}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{tikz}
+
+% Tablas
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{tabularx}
+
+% Matemáticas
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% Código fuente
+\usepackage{listings}
+\usepackage{minted}          % requiere --shell-escape; alternativa: listings
+
+% Referencias y enlaces
+\usepackage[hidelinks, colorlinks=true,
+            linkcolor=NavyBlue, citecolor=NavyBlue,
+            urlcolor=NavyBlue]{hyperref}
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{referencias.bib}
+
+% Encabezados y pies de página
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+
+% Listas y enumeraciones
+\usepackage{enumitem}
+
+% Cajas de notas / avisos
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+% Espaciado entre líneas
+\usepackage{setspace}
+\onehalfspacing
+
+% Para cronograma / Gantt (opcional)
+% \usepackage{pgfgantt}
+
+%% ─── Colores corporativos ───────────────────────────────────
+\definecolor{upmeBlue}{RGB}{0, 70, 127}
+\definecolor{upmeLightBlue}{RGB}{0, 153, 204}
+\definecolor{upmeGray}{RGB}{90, 90, 90}
+\definecolor{upmeGreen}{RGB}{34, 139, 34}
+
+%% ─── Encabezados y pies ─────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{upmeGray} Análisis de Potencial Solar — Territorios PDET}
+\fancyhead[R]{\small\color{upmeGray} UPME · \the\year}
+\fancyfoot[C]{\small Página \thepage\ de \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+%% ─── Entorno para cajas de avance semanal ───────────────────
+\newtcolorbox{semanabox}[2][]{
+  breakable,
+  colback  = upmeLightBlue!8,
+  colframe = upmeBlue,
+  fonttitle= \bfseries\color{white},
+  coltitle = white,
+  colbacktitle = upmeBlue,
+  title    = {Semana #2 — #1},
+  #1
+}
+
+\newtcolorbox{pendientebox}[1][]{
+  breakable,
+  colback  = yellow!10,
+  colframe = orange!80!black,
+  fonttitle= \bfseries,
+  title    = {Pendiente / Por completar},
+  #1
+}
+
+%% ─── Configuración listings ─────────────────────────────────
+\lstset{
+  basicstyle   = \ttfamily\small,
+  keywordstyle = \color{upmeBlue}\bfseries,
+  commentstyle = \color{upmeGreen}\itshape,
+  stringstyle  = \color{red!70!black},
+  numbers      = left,
+  numberstyle  = \tiny\color{upmeGray},
+  frame        = single,
+  breaklines   = true,
+  captionpos   = b,
+  tabsize      = 4,
+  showstringspaces = false,
+}
+
+%% ─── Metadatos del documento ────────────────────────────────
+\hypersetup{
+  pdftitle  = {Análisis de Potencial Solar en Territorios PDET},
+  pdfauthor = {Grupo X — Administración de Bases de Datos},
+  pdfsubject= {Proyecto Final},
+}
+
+%% ============================================================
+%%  INICIO DEL DOCUMENTO
+%% ============================================================
+\begin{document}
+
+%% ─── Portada ────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{1cm}
+
+  % Logo institucional (reemplazar con ruta real)
+  % \includegraphics[width=0.35\textwidth]{figuras/logo_upme.png}\\[1.5em]
+
+  {\color{upmeBlue}\rule{\textwidth}{2pt}}\\[0.8em]
+
+  {\Huge\bfseries\color{upmeBlue}
+    Análisis de Potencial Solar en\\[0.4em]
+    Territorios PDET de Colombia}\\[0.8em]
+
+  {\color{upmeBlue}\rule{\textwidth}{0.8pt}}\\[1.5em]
+
+  {\Large Informe Técnico Final}\\[0.4em]
+  {\large Administración de Bases de Datos}\\[2em]
+
+  \begin{tabular}{rl}
+    \textbf{Curso:}    & Administración de Bases de Datos \\[0.3em]
+    \textbf{Profesor:} & Andrés Oswaldo Calderón Romero, Ph.D. \\[0.3em]
+    \textbf{Grupo:}    & \textit{[Nombre del grupo]} \\[0.3em]
+    \textbf{Integrantes:} & \textit{[Nombre 1]} \\
+                          & \textit{[Nombre 2]} \\
+                          & \textit{[Nombre 3]} \\[0.3em]
+    \textbf{Fecha:}    & \today \\
+  \end{tabular}
+
+  \vfill
+
+  {\small\color{upmeGray}
+    Proyecto desarrollado en el marco de la iniciativa de la\\
+    Unidad de Planeación Minero Energética (UPME) para la\\
+    identificación de zonas aptas para energía solar fotovoltaica.}
+
+  \vspace{1em}
+  {\color{upmeBlue}\rule{\textwidth}{1.5pt}}
+\end{titlepage}
+
+%% ─── Resumen ejecutivo ──────────────────────────────────────
+\chapter*{Resumen Ejecutivo}
+\addcontentsline{toc}{chapter}{Resumen Ejecutivo}
+
+\textit{[Completar al finalizar el proyecto. Incluir: objetivo principal, metodología
+empleada, principales hallazgos numéricos (número de municipios PDET analizados,
+cantidad de edificaciones, área total de techos) y recomendaciones clave.]}
+
+\bigskip
+\noindent\textbf{Palabras clave:} energía solar, territorios PDET, análisis geoespacial,
+NoSQL, Microsoft Building Footprints, Google Open Buildings, Colombia.
+
+%% ─── Tabla de contenidos ────────────────────────────────────
+\tableofcontents
+\listoffigures
+\listoftables
+\newpage
+
+%% ============================================================
+%%  CAPÍTULO 1 — INTRODUCCIÓN
+%% ============================================================
+\chapter{Introducción}
+\label{cap:intro}
+
+\section{Contexto general}
+
+Colombia atraviesa una transformación acelerada de su matriz energética orientada
+hacia fuentes renovables \parencite{iea2023colombia}. En este marco, la
+Unidad de Planeación Minero Energética (UPME) lidera iniciativas para identificar
+territorios con potencial para la instalación de soluciones de energía solar,
+con énfasis en los Programas de Desarrollo con Enfoque Territorial
+(PDET) \parencite{upme2022plan}.
+
+Los territorios PDET, establecidos por el Decreto 893 de 2017 como parte de la
+implementación del Acuerdo de Paz, comprenden 170 municipios en 16 subregiones
+prioritarias del país. Estas zonas combinan rezago histórico en infraestructura
+con condiciones geográficas favorables para la captación de energía solar
+\parencite{arteaga2021pdet}.
+
+\section{Motivación}
+
+La estimación del área de techumbres disponible para paneles solares a escala
+municipal es una tarea que requiere el procesamiento eficiente de grandes
+volúmenes de datos geoespaciales. Los conjuntos de datos de edificaciones
+derivados de imágenes satelitales —como Microsoft Building Footprints y
+Google Open Buildings— representan recursos valiosos para este fin, pero
+su magnitud (más de mil millones de registros) impone el uso de tecnologías
+de almacenamiento y consulta escalables \parencite{microsoft2023buildings,
+sirko2021continental}.
+
+\section{Objetivo general}
+
+Diseñar e implementar un flujo de trabajo geoespacial reproducible, basado
+en soluciones NoSQL, para estimar el número de edificaciones y el área total
+de techumbres aptas para instalación de paneles solares en los municipios
+PDET de Colombia.
+
+\section{Objetivos específicos}
+
+\begin{enumerate}[label=\arabic*.]
+  \item Diseñar un esquema NoSQL adecuado para el almacenamiento y consulta
+        eficiente de datos geoespaciales a escala nacional.
+  \item Integrar las capas de límites administrativos PDET provenientes del
+        Marco Geoestadístico Nacional (MGN) del DANE.
+  \item Cargar y validar al menos dos conjuntos de datos de edificaciones
+        (Microsoft y/o Google y/o GlobalBuildingAtlas).
+  \item Ejecutar operaciones de intersección espacial para estimar el conteo
+        y área de techumbres por municipio PDET.
+  \item Elaborar visualizaciones y recomendaciones para UPME.
+\end{enumerate}
+
+\section{Alcance y limitaciones}
+
+\textit{[Describir qué queda dentro y fuera del alcance: municipios analizados,
+versiones de datasets utilizados, supuestos sobre inclinación de techos, etc.]}
+
+\section{Estructura del informe}
+
+El presente informe se organiza en cinco capítulos que corresponden a las
+cinco entregas semanales del proyecto, seguidos de conclusiones y referencias.
+
+%% ============================================================
+%%  CAPÍTULO 2 — MARCO TEÓRICO
+%% ============================================================
+\chapter{Marco Teórico}
+\label{cap:marco}
+
+\section{Energía solar fotovoltaica: fundamentos}
+
+La energía solar fotovoltaica convierte la radiación solar directamente en
+electricidad mediante el efecto fotoeléctrico \parencite{luque2011handbook}.
+El potencial de generación depende fundamentalmente de la irradiancia global
+horizontal (GHI) y del área efectiva de captación disponible. Colombia, al
+encontrarse entre los $4°\text{N}$ y $12°\text{N}$ de latitud, presenta
+valores de GHI superiores a $4{,}5\,\text{kWh/m}^2/\text{día}$ en gran parte
+de su territorio \parencite{atlas2020solar}.
+
+\section{Territorios PDET y equidad energética}
+
+Los territorios PDET fueron definidos por el Decreto 893 de 2017 como áreas
+prioritarias para la implementación del punto uno del Acuerdo Final de Paz,
+relacionado con la Reforma Rural Integral \parencite{decreto893_2017}.
+La literatura evidencia que estas regiones exhiben déficits persistentes
+en cobertura eléctrica, lo cual refuerza la pertinencia de explorar soluciones
+descentralizadas como la generación solar distribuida
+\parencite{rodriguez2020energia}.
+
+\section{Detección de edificaciones mediante imágenes satelitales}
+
+La extracción automática de huellas de edificaciones a partir de imágenes
+satelitales de alta resolución se apoya en arquitecturas de aprendizaje
+profundo, especialmente redes neuronales convolucionales (CNN) y modelos
+de segmentación semántica como U-Net \parencite{ronneberger2015unet}.
+
+\subsection{Microsoft Building Footprints}
+
+El conjunto de datos de Bing Maps comprende más de 999 millones de
+detecciones de edificios derivadas de imágenes Maxar y Airbus recopiladas
+entre 2014 y 2021. El modelo de detección utiliza una arquitectura ResNet
+entrenada con datos etiquetados manualmente, alcanzando una precisión
+superior al 90\,\% en zonas urbanas \parencite{microsoft2023buildings}.
+Los datos se distribuyen bajo la licencia ODbL.
+
+\subsection{Google Open Buildings}
+
+Sirko et al. \parencite*{sirko2021continental} presentan un conjunto de
+datos con 1\,800 millones de detecciones que cubre África, Asia meridional,
+América Latina y el Caribe. La tercera versión del dataset incorpora mejoras
+en regiones de vegetación densa y zonas rurales. Se distribuye bajo licencias
+CC BY-4.0 y ODbL.
+
+\subsection{GlobalBuildingAtlas (TUM)}
+
+Desarrollado por la Universidad Técnica de Múnich, este atlas contiene
+2\,750 millones de modelos tridimensionales de edificios con resolución
+espacial de $3\times3\,\text{m}$, derivados de imágenes satelitales de 2019
+\parencite{geiß2022global}. La disponibilidad de atributos de altura
+permite estimar volumen y pendiente del techo.
+
+\section{Sistemas de gestión de bases de datos NoSQL}
+
+\subsection{Motivación para NoSQL en datos geoespaciales}
+
+El paradigma NoSQL surge como respuesta a las limitaciones de los sistemas
+relacionales para manejar datos no estructurados, distribuidos y de gran
+volumen \parencite{han2011survey}. En el contexto geoespacial, las bases de
+datos de documentos y los sistemas orientados a columnas ofrecen ventajas
+significativas en términos de escalabilidad horizontal y flexibilidad de
+esquema.
+
+\subsection{MongoDB y operaciones geoespaciales}
+
+MongoDB implementa índices geoespaciales de tipo \texttt{2dsphere} compatibles
+con el estándar GeoJSON \parencite{mongodb2023geo}. Sus operadores
+\texttt{\$geoIntersects} y \texttt{\$geoWithin} permiten consultas de
+intersección y contención poligonal directamente sobre los documentos
+almacenados.
+
+\subsection{Alternativas consideradas}
+
+\textit{[Completar con otras opciones evaluadas: PostgreSQL/PostGIS como
+referencia relacional, Apache Cassandra, Amazon DynamoDB, etc., y justificar
+la elección final.]}
+
+\section{Marco Geoestadístico Nacional (MGN)}
+
+El MGN, publicado por el DANE, constituye el sistema de referencia cartográfica
+oficial de Colombia. Su capa municipal incluye los polígonos de los
+1\,122 municipios del país con sus respectivos códigos DIVIPOLA
+\parencite{dane2025mgn}. Para este proyecto se utiliza la versión MGN2025.
+
+\section{Índices espaciales y eficiencia de consultas}
+
+Los índices espaciales de tipo R-tree permiten realizar búsquedas de
+proximidad e intersección en tiempo $O(\log n)$ en lugar de $O(n)$
+\parencite{guttman1984rtree}. Su implementación en bases de datos NoSQL
+es fundamental para procesar consultas sobre millones de polígonos de
+edificaciones en tiempos razonables.
+
+%% ============================================================
+%%  CAPÍTULO 3 — ENTREGA 1: DISEÑO DE ESQUEMA NOSQL
+%%  Semana 1
+%% ============================================================
+\chapter{Diseño del Esquema NoSQL e Plan de Implementación}
+\label{cap:entrega1}
+
+\begin{semanabox}[Entrega 1]{1}
+  \textbf{Objetivo:} Diseñar el esquema NoSQL y elaborar el plan de implementación
+  tecnológica del proyecto.\\
+  \textbf{Fecha de entrega:} Semana 1, antes de las 14:00 h.
+\end{semanabox}
+
+\section{Plan de implementación}
+
+\textit{[Describir la arquitectura general: tecnologías seleccionadas, entorno
+de desarrollo (local/nube), herramientas de ETL, lenguajes de programación
+y bibliotecas geoespaciales (PyMongo, Shapely, GeoPandas, etc.)]}
+
+\subsection{Pila tecnológica}
+
+\begin{table}[H]
+  \centering
+  \caption{Pila tecnológica del proyecto}
+  \label{tab:pila}
+  \begin{tabularx}{\textwidth}{lXl}
+    \toprule
+    \textbf{Componente} & \textbf{Descripción} & \textbf{Versión} \\
+    \midrule
+    Base de datos       & \textit{[ej. MongoDB Atlas]} & \textit{[x.x]} \\
+    Lenguaje principal  & Python & 3.11 \\
+    Biblioteca espacial & GeoPandas & \textit{[x.x]} \\
+    Visualización       & Folium / Matplotlib & \textit{[x.x]} \\
+    Control de versiones & Git / GitHub & — \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Modelado de datos}
+
+\textit{[Presentar el modelo conceptual: entidades principales
+(Municipio, EdificaciónMicrosoft, EdificaciónGoogle), relaciones y
+cardinalidades.]}
+
+\section{Diseño del esquema}
+
+\textit{[Mostrar el esquema de documentos en formato JSON/BSON para cada
+colección. Justificar decisiones de embedding vs. referencing.]}
+
+\begin{lstlisting}[language=Python, caption={Esquema documento — Colección \texttt{municipios\_pdet}}]
+{
+  "_id": ObjectId("..."),
+  "cod_divipola": "05001",
+  "nombre": "Medellín",
+  "departamento": "Antioquia",
+  "es_pdet": true,
+  "subregion_pdet": "Bajo Cauca y Nordeste Antioqueño",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[ [lng1, lat1], [lng2, lat2], ... ]]
+  },
+  "estadisticas": {
+    "num_edificaciones_ms": null,
+    "area_total_m2_ms": null,
+    "num_edificaciones_google": null,
+    "area_total_m2_google": null
+  }
+}
+\end{lstlisting}
+
+\section{Justificación de la solución NoSQL}
+
+\textit{[Argumentar por qué la solución NoSQL seleccionada es apropiada
+para este caso de uso frente a alternativas relacionales.]}
+
+\section{Avance y resultados de la Semana 1}
+
+\textit{[Resumir lo logrado: repositorio creado, esquema implementado,
+colecciones creadas, índices definidos.]}
+
+%% ============================================================
+%%  CAPÍTULO 4 — ENTREGA 2: INTEGRACIÓN DE LÍMITES PDET
+%%  Semana 2
+%% ============================================================
+\chapter{Integración del Dataset de Municipios PDET}
+\label{cap:entrega2}
+
+\begin{semanabox}[Entrega 2]{2}
+  \textbf{Objetivo:} Adquirir, limpiar e integrar los límites administrativos
+  de los municipios PDET en la base de datos NoSQL.\\
+  \textbf{Fecha de entrega:} Semana 2, antes de las 14:00 h (defensa en clase).
+\end{semanabox}
+
+\section{Adquisición de datos — MGN DANE}
+
+\textit{[Describir la fuente, versión descargada (MGN2025), URL, fecha de acceso
+y formato original (Shapefile / GeoPackage).]}
+
+\subsection{Verificación de integridad}
+
+\textit{[Checksum del archivo, número de municipios esperados (1\,122) vs.
+encontrados, validación de CRS (EPSG:4686 — MAGNA-SIRGAS).]}
+
+\section{Identificación y filtrado de municipios PDET}
+
+\textit{[Explicar cómo se obtuvo la lista oficial de municipios PDET (170),
+la fuente de la lista (decreto, SIIPO, hoja de cálculo del ART) y el método
+de cruce con la capa del MGN.]}
+
+\begin{table}[H]
+  \centering
+  \caption{Resumen de municipios PDET por subregión}
+  \label{tab:pdet_subregiones}
+  \begin{tabular}{llc}
+    \toprule
+    \textbf{Subregión} & \textbf{Departamentos principales} & \textbf{N° municipios} \\
+    \midrule
+    Bajo Cauca y Nordeste Antioqueño & Antioquia & \textit{X} \\
+    Urabá Antioqueño                 & Antioquia, Chocó & \textit{X} \\
+    Chocó                            & Chocó & \textit{X} \\
+    \textit{[Completar las 16 subregiones]} & & \\
+    \midrule
+    \textbf{Total} & & \textbf{170} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Integración espacial en NoSQL}
+
+\textit{[Describir el proceso de carga: conversión a GeoJSON, inserción en la
+colección \texttt{municipios\_pdet}, creación del índice \texttt{2dsphere}.
+Incluir fragmento de código relevante.]}
+
+\section{Validación de la carga}
+
+\textit{[Número de documentos insertados, consultas de prueba, mapa de
+validación visual con los 170 municipios PDET.]}
+
+\begin{figure}[H]
+  \centering
+  % \includegraphics[width=0.85\textwidth]{figuras/mapa_municipios_pdet.png}
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}
+    \textit{[Insertar mapa coroplético con los 170 municipios PDET resaltados]}
+    \vspace{3cm}}}
+  \caption{Municipios PDET en Colombia — Fuente: DANE MGN2025, elaboración propia.}
+  \label{fig:mapa_pdet}
+\end{figure}
+
+\section{Avance y resultados de la Semana 2}
+
+\textit{[Síntesis de logros, obstáculos encontrados y cómo se resolvieron.]}
+
+%% ============================================================
+%%  CAPÍTULO 5 — ENTREGA 3: CARGA DE HUELLAS DE EDIFICACIONES
+%%  Semana 3
+%% ============================================================
+\chapter{Carga e Integración de Datos de Edificaciones}
+\label{cap:entrega3}
+
+\begin{semanabox}[Entrega 3]{3}
+  \textbf{Objetivo:} Adquirir, cargar y realizar un análisis exploratorio
+  de los conjuntos de datos de edificaciones seleccionados.\\
+  \textbf{Fecha de entrega:} Semana 3, antes de las 14:00 h.
+\end{semanabox}
+
+\section{Datasets seleccionados}
+
+Para este proyecto se seleccionaron los siguientes dos conjuntos de datos:
+
+\begin{enumerate}
+  \item \textbf{Microsoft Building Footprints} \parencite{microsoft2023buildings}
+  \item \textbf{Google Open Buildings v3} \parencite{sirko2021continental}
+\end{enumerate}
+
+\textit{[Justificar brevemente la selección y descartar el tercero si aplica.]}
+
+\section{Dataset 1: Microsoft Building Footprints}
+
+\subsection{Adquisición}
+
+\textit{[Describir el proceso de descarga: Planetary Computer, archivos
+GeoParquet por país, volumen total para Colombia.]}
+
+\subsection{Formato y estructura}
+
+\textit{[Describir las columnas del dataset: geometry, confidence, etc.
+Incluir tabla de metadatos.]}
+
+\subsection{Carga en NoSQL}
+
+\textit{[Estrategia de particionamiento, tiempos de carga, índices creados.]}
+
+\subsection{Análisis exploratorio (EDA)}
+
+\textit{[Estadísticas básicas: total de edificaciones en Colombia, distribución
+de áreas, histogramas, comparación urbano/rural.]}
+
+\section{Dataset 2: Google Open Buildings}
+
+\subsection{Adquisición}
+
+\textit{[Tiles descargados, formato CSV/GeoJSON, identificación de tiles
+que intersectan con bounding box de Colombia.]}
+
+\subsection{Carga en NoSQL e índices espaciales}
+
+\textit{[Mismo esquema que Dataset 1.]}
+
+\subsection{Análisis exploratorio (EDA)}
+
+\textit{[Comparar cobertura y características con Microsoft.]}
+
+\section{Comparación preliminar de datasets}
+
+\begin{table}[H]
+  \centering
+  \caption{Comparación de datasets de edificaciones para Colombia}
+  \label{tab:comparacion_datasets}
+  \begin{tabularx}{\textwidth}{lXX}
+    \toprule
+    \textbf{Aspecto} & \textbf{Microsoft} & \textbf{Google} \\
+    \midrule
+    Total edificaciones (Colombia) & & \\
+    Tamaño en disco               & & \\
+    Año de imágenes               & 2014–2021 & \textit{[x]} \\
+    Atributos de área             & & \\
+    Licencia                      & ODbL & CC BY-4.0 / ODbL \\
+    Tiempo de carga               & & \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Avance y resultados de la Semana 3}
+
+\textit{[Síntesis: número total de documentos cargados por dataset,
+desafíos de ETL, tiempos, métricas de calidad de datos.]}
+
+%% ============================================================
+%%  CAPÍTULO 6 — ENTREGA 4: ANÁLISIS GEOESPACIAL REPRODUCIBLE
+%%  Semana 4
+%% ============================================================
+\chapter{Flujo de Trabajo Geoespacial Reproducible}
+\label{cap:entrega4}
+
+\begin{semanabox}[Entrega 4]{4}
+  \textbf{Objetivo:} Implementar y documentar el flujo de intersección espacial
+  para estimar conteo y área de techumbres por municipio PDET.\\
+  \textbf{Fecha de entrega:} Semana 4, antes de las 14:00 h (defensa en clase).
+\end{semanabox}
+
+\section{Metodología de análisis espacial}
+
+\textit{[Describir el pipeline: consulta de intersección por municipio →
+filtrado por bounding box → intersección poligonal exacta → agregación.
+Diagramar el flujo con un esquema.]}
+
+\subsection{Intersección espacial en NoSQL}
+
+\textit{[Mostrar las queries de intersección, operadores utilizados
+(\texttt{\$geoIntersects}, aggregation pipeline), ejemplo de salida.]}
+
+\begin{lstlisting}[language=Python,
+  caption={Consulta de intersección — Edificaciones Microsoft por municipio}]
+pipeline = [
+    {
+        "$match": {
+            "geometry": {
+                "$geoIntersects": {
+                    "$geometry": municipio_geometry
+                }
+            }
+        }
+    },
+    {
+        "$group": {
+            "_id": None,
+            "count": {"$sum": 1},
+            "area_total_m2": {"$sum": "$area_m2"}
+        }
+    }
+]
+result = collection_ms.aggregate(pipeline)
+\end{lstlisting}
+
+\subsection{Reproducibilidad}
+
+\textit{[Describir el entorno Conda/Docker, el archivo de requerimientos
+y las instrucciones de ejecución del pipeline.]}
+
+\section{Resultados por municipio PDET}
+
+\subsection{Dataset Microsoft}
+
+\begin{longtable}{llrr}
+  \caption{Top 10 municipios PDET por área total de techumbres — Microsoft}
+  \label{tab:resultados_ms}\\
+  \toprule
+  \textbf{Municipio} & \textbf{Departamento} & \textbf{N° edif.}
+                     & \textbf{Área total (m²)} \\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Municipio} & \textbf{Departamento} & \textbf{N° edif.}
+                     & \textbf{Área total (m²)} \\
+  \midrule
+  \endhead
+  \textit{[Municipio 1]} & & & \\
+  \textit{[Municipio 2]} & & & \\
+  \textit{[\ldots]}      & & & \\
+  \bottomrule
+\end{longtable}
+
+\subsection{Dataset Google}
+
+\textit{[Tabla equivalente para Google Open Buildings.]}
+
+\section{Visualizaciones}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \fbox{\parbox{\textwidth}{\centering\vspace{3cm}
+      \textit{[Mapa coroplético — área total Microsoft]}
+      \vspace{3cm}}}
+    \caption{Microsoft Building Footprints}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \fbox{\parbox{\textwidth}{\centering\vspace{3cm}
+      \textit{[Mapa coroplético — área total Google]}
+      \vspace{3cm}}}
+    \caption{Google Open Buildings}
+  \end{subfigure}
+  \caption{Área total de techumbres por municipio PDET según cada dataset.}
+  \label{fig:mapas_comparativos}
+\end{figure}
+
+\section{Comparación entre datasets}
+
+\textit{[Análisis de concordancia: correlación de conteos, diferencias
+sistemáticas por región, posibles explicaciones metodológicas.]}
+
+\section{Avance y resultados de la Semana 4}
+
+\textit{[Síntesis del pipeline, validación de resultados, hallazgos
+preliminares más relevantes.]}
+
+%% ============================================================
+%%  CAPÍTULO 7 — ENTREGA 5: INFORME FINAL Y RECOMENDACIONES
+%%  Semana 5
+%% ============================================================
+\chapter{Resultados Finales y Recomendaciones para UPME}
+\label{cap:entrega5}
+
+\begin{semanabox}[Entrega 5 — Informe Final]{5}
+  \textbf{Objetivo:} Consolidar resultados, elaborar recomendaciones y
+  entregar el informe técnico completo.\\
+  \textbf{Fecha de entrega:} Semana 5, antes de las 14:00 h (defensa privada).
+\end{semanabox}
+
+\section{Síntesis de resultados}
+
+\textit{[Presentar las cifras finales consolidadas: total de edificaciones
+y área de techumbres en los 170 municipios PDET según cada dataset.
+Incluir tabla resumen y gráfico comparativo.]}
+
+\section{Análisis de potencial solar}
+
+\textit{[Estimar potencial de generación: área de techo × factor de
+utilización (ej. 70\,\%) × irradiancia promedio × eficiencia de panel.
+Puede basarse en datos del Atlas de Radiación Solar de Colombia.]}
+
+\begin{equation}
+  E_{\text{anual}} = A_{\text{techo}} \times \eta_{\text{util}}
+                   \times \overline{GHI} \times \eta_{\text{panel}}
+                   \times 365
+  \label{eq:energia}
+\end{equation}
+
+donde $A_{\text{techo}}$ es el área disponible [m²], $\eta_{\text{util}}$
+el factor de utilización, $\overline{GHI}$ la irradiancia diaria media
+[kWh/m²/día] y $\eta_{\text{panel}}$ la eficiencia del panel fotovoltaico.
+
+\section{Municipios prioritarios para proyectos piloto}
+
+\textit{[Proponer un ranking de municipios PDET considerando: (1) área
+de techo disponible, (2) irradiancia, (3) déficit de cobertura eléctrica,
+(4) accesibilidad. Incluir mapa de priorización.]}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{4cm}
+    \textit{[Mapa final de priorización de municipios PDET para proyectos piloto]}
+    \vspace{4cm}}}
+  \caption{Municipios PDET priorizados para proyectos piloto de energía solar.}
+  \label{fig:priorizacion}
+\end{figure}
+
+\section{Recomendaciones para UPME}
+
+\begin{enumerate}[label=\textbf{R\arabic*.}, leftmargin=2.5cm]
+  \item \textbf{Validación en campo:} \textit{[Recomendación 1]}
+  \item \textbf{Dataset preferido:} \textit{[Recomendación 2]}
+  \item \textbf{Infraestructura de datos:} \textit{[Recomendación 3]}
+  \item \textbf{Próximos pasos:} \textit{[Recomendación 4]}
+  \item \textit{[Agregar las que sean pertinentes]}
+\end{enumerate}
+
+\section{Limitaciones y trabajo futuro}
+
+\textit{[Discutir limitaciones del análisis: calidad de datos satelitales en
+zonas de nubosidad alta, inclinación de techos no modelada, cambios de uso del
+suelo post-imagen. Proponer líneas de trabajo futuro.]}
+
+%% ============================================================
+%%  CAPÍTULO 8 — CONCLUSIONES
+%% ============================================================
+\chapter{Conclusiones}
+\label{cap:conclusiones}
+
+\textit{[Sintetizar los principales aprendizajes técnicos y los hallazgos del
+análisis. Reflexionar sobre el uso de NoSQL para datos geoespaciales a gran
+escala y la viabilidad del enfoque para apoyar la política energética
+colombiana.]}
+
+%% ============================================================
+%%  REFERENCIAS
+%% ============================================================
+\printbibliography[heading=bibintoc, title={Referencias}]
+
+%% ============================================================
+%%  APÉNDICES
+%% ============================================================
+\appendix
+
+\chapter{Repositorio y Estructura de Archivos}
+\label{ap:repo}
+
+\textit{[Incluir URL del repositorio GitHub y árbol de directorios del proyecto.]}
+
+\begin{lstlisting}[caption={Estructura del repositorio}]
+proyecto-upme-solar/
+├── README.md
+├── requirements.txt
+├── data/
+│   ├── raw/
+│   │   ├── mgn2025/
+│   │   ├── ms_buildings/
+│   │   └── google_buildings/
+│   └── processed/
+├── notebooks/
+│   ├── 01_schema_design.ipynb
+│   ├── 02_pdet_integration.ipynb
+│   ├── 03_buildings_loading.ipynb
+│   ├── 04_spatial_analysis.ipynb
+│   └── 05_results_viz.ipynb
+├── src/
+│   ├── db/
+│   ├── etl/
+│   └── analysis/
+├── outputs/
+│   ├── maps/
+│   └── tables/
+└── informe/
+    ├── informe_upme_solar.tex
+    └── referencias.bib
+\end{lstlisting}
+
+\chapter{Diccionario de Datos}
+\label{ap:diccionario}
+
+\textit{[Describir todos los campos de cada colección NoSQL: nombre, tipo,
+descripción, ejemplo de valor.]}
+
+\chapter{Instrucciones de Reproducción}
+\label{ap:reproduccion}
+
+\textit{[Paso a paso para reproducir el análisis desde cero: instalación
+de dependencias, configuración de MongoDB, ejecución de notebooks en orden.]}
+
+\end{document}
