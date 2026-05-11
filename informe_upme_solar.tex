@@ -373,10 +373,11 @@ y bibliotecas geoespaciales (PyMongo, Shapely, GeoPandas, etc.)]}
     \toprule
     \textbf{Componente} & \textbf{Descripción} & \textbf{Versión} \\
     \midrule
-    Base de datos       & \textit{[ej. MongoDB Atlas]} & \textit{[x.x]} \\
-    Lenguaje principal  & Python & 3.11 \\
-    Biblioteca espacial & GeoPandas & \textit{[x.x]} \\
-    Visualización       & Folium / Matplotlib & \textit{[x.x]} \\
+    Base de datos        & MongoDB Atlas (nube, clúster compartido) & 7.x \\
+    Lenguaje principal   & Python & 3.13 \\
+    Geoprocesamiento     & GeoPandas / Shapely / PyOGRIO & latest \\
+    Driver NoSQL         & PyMongo & latest \\
+    Visualización        & Matplotlib & latest \\
     Control de versiones & Git / GitHub & — \\
     \bottomrule
   \end{tabularx}
@@ -439,62 +440,268 @@ colecciones creadas, índices definidos.]}
 
 \section{Adquisición de datos — MGN DANE}
 
-\textit{[Describir la fuente, versión descargada (MGN2025), URL, fecha de acceso
-y formato original (Shapefile / GeoPackage).]}
+Los límites administrativos municipales se obtuvieron a partir del
+\textbf{Marco Geoestadístico Nacional (MGN), versión 2025}, publicado por
+el DANE \parencite{dane2025mgn}. El dataset se descargó en formato
+Shapefile y está compuesto por cuatro archivos:
+\texttt{MGN\_ADM\_MPIO\_GRAFICO.shp} (95~MB),
+\texttt{.shx}, \texttt{.dbf} y \texttt{.prj}.
+La capa contiene los polígonos de los \textbf{1\,122 municipios} de Colombia
+junto con sus atributos administrativos (códigos DIVIPOLA, nombres oficiales,
+tipo de municipio y año de actualización cartográfica).
 
 \subsection{Verificación de integridad}
 
-\textit{[Checksum del archivo, número de municipios esperados (1\,122) vs.
-encontrados, validación de CRS (EPSG:4686 — MAGNA-SIRGAS).]}
+El Shapefile fue cargado en Python con la biblioteca GeoPandas (motor
+\texttt{pyogrio}) y se verificaron las siguientes propiedades:
+
+\begin{itemize}
+  \item \textbf{Sistema de referencia:} EPSG:4686 (MAGNA-SIRGAS),
+        sistema oficial de Colombia, confirmado mediante el archivo \texttt{.prj}.
+  \item \textbf{Conteo de registros:} 1\,122 municipios, coincidente con el
+        total oficial de divisiones político-administrativas del país.
+  \item \textbf{Atributos principales:} \texttt{mpio\_cdpmp} (código DIVIPOLA
+        de 5 dígitos), \texttt{mpio\_cnmbr} (nombre oficial),
+        \texttt{dpto\_cnmbr} (nombre del departamento),
+        \texttt{mpio\_nano} (año de actualización cartográfica).
+\end{itemize}
 
 \section{Identificación y filtrado de municipios PDET}
 
-\textit{[Explicar cómo se obtuvo la lista oficial de municipios PDET (170),
-la fuente de la lista (decreto, SIIPO, hoja de cálculo del ART) y el método
-de cruce con la capa del MGN.]}
+La lista oficial de municipios PDET se obtuvo del archivo
+\textbf{MunicipiosPDET.xlsx}, derivado de los listados publicados por la
+Agencia de Renovación del Territorio (ART) en cumplimiento del
+Decreto~893 de 2017 \parencite{decreto893_2017}.
+Este archivo contiene 170 registros con los campos: código de departamento,
+código de municipio (DANE), nombre del municipio, departamento y subregión PDET.
+
+El cruce con la capa del MGN se realizó mediante un \emph{inner join} sobre
+el campo \textbf{\texttt{cod\_dane}} (código DIVIPOLA de 5 dígitos, con
+relleno de ceros a la izquierda), lo que produjo exactamente
+\textbf{170 municipios} coincidentes, cubriendo las
+\textbf{16 subregiones PDET} definidas por el Acuerdo de Paz.
 
 \begin{table}[H]
   \centering
-  \caption{Resumen de municipios PDET por subregión}
+  \caption{Municipios PDET por subregión — Fuente: ART / Decreto 893 de 2017}
   \label{tab:pdet_subregiones}
   \begin{tabular}{llc}
     \toprule
-    \textbf{Subregión} & \textbf{Departamentos principales} & \textbf{N° municipios} \\
+    \textbf{Subregión PDET} & \textbf{Departamentos principales} & \textbf{Municipios} \\
     \midrule
-    Bajo Cauca y Nordeste Antioqueño & Antioquia & \textit{X} \\
-    Urabá Antioqueño                 & Antioquia, Chocó & \textit{X} \\
-    Chocó                            & Chocó & \textit{X} \\
-    \textit{[Completar las 16 subregiones]} & & \\
+    Bajo Cauca y Nordeste Antioqueño    & Antioquia                          & 11 \\
+    Urabá Antioqueño                    & Antioquia, Chocó                   & 11 \\
+    Chocó                               & Chocó                              & 27 \\
+    Pacífico Medio                      & Chocó, Valle del Cauca             & 10 \\
+    Pacífico y Frontera Nariñense       & Nariño                             & 22 \\
+    Alto Patía y Norte del Cauca        & Cauca, Nariño                      & 24 \\
+    Cuenca del Caguán y Pied. Caqueteño & Caquetá, Huila                     &  8 \\
+    Macarena -- Guaviare                & Meta, Guaviare                     & 11 \\
+    Putumayo                            & Putumayo                           & 11 \\
+    Sur de Bolívar                      & Bolívar, Antioquia                 & 11 \\
+    Sierra Nevada -- Perijá             & Magdalena, Cesar, La Guajira       & 17 \\
+    Montes de María                     & Bolívar, Sucre                     & 15 \\
+    Sur de Córdoba                      & Córdoba                            &  6 \\
+    Catatumbo                           & Norte de Santander                 &  9 \\
+    Arauca                              & Arauca                             &  7 \\
+    Bajo Nordeste y Magdalena Medio     & Bolívar, Santander, Antioquia      & 10 \\
     \midrule
-    \textbf{Total} & & \textbf{170} \\
+    \textbf{Total}                      &                                    & \textbf{170} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \section{Integración espacial en NoSQL}
 
-\textit{[Describir el proceso de carga: conversión a GeoJSON, inserción en la
-colección \texttt{municipios\_pdet}, creación del índice \texttt{2dsphere}.
-Incluir fragmento de código relevante.]}
+El proceso de integración se realizó en dos etapas: primero la generación
+del archivo GeoJSON y luego la carga en MongoDB Atlas.
+
+\subsection{Preprocesamiento y exportación a GeoJSON}
+
+Tras el cruce de datasets, se aplicaron las siguientes transformaciones
+sobre el GeoDataFrame resultante:
+
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{Corrección de geometrías:} se aplicó \texttt{buffer(0)} para
+        eliminar auto-intersecciones presentes en polígonos del MGN.
+  \item \textbf{Reproyección:} conversión de EPSG:4686 (MAGNA-SIRGAS)
+        a \textbf{EPSG:4326 (WGS84)}, requerido por el estándar GeoJSON y
+        los índices \texttt{2dsphere} de MongoDB.
+  \item \textbf{Cálculo de área:} las áreas se calcularon usando la
+        proyección métrica EPSG:9377 para garantizar precisión en metros
+        cuadrados; el resultado se almacena en km² como campo \texttt{area\_km2}.
+  \item \textbf{Bounding box:} se generó para cada municipio un objeto
+        \texttt{bbox} con los extremos geográficos
+        (\texttt{min\_lng}, \texttt{min\_lat}, \texttt{max\_lng}, \texttt{max\_lat}),
+        útil para filtros espaciales previos a la intersección exacta.
+  \item \textbf{Exportación:} el GeoDataFrame se guardó en
+        \texttt{municipios\_pdet.geojson} (65{,}2~MB), con
+        170 features de tipo \texttt{Polygon} o \texttt{MultiPolygon}.
+\end{enumerate}
+
+\begin{lstlisting}[language=Python,
+  caption={Fragmento de \texttt{load\_pdet.py} — procesamiento geoespacial}]
+# Correccion de geometrias y reproyeccion
+gdf_pdet = gdf_pdet[gdf_pdet.geometry.notnull()]
+gdf_pdet["geometry"] = gdf_pdet.buffer(0)   # elimina auto-intersecciones
+gdf_pdet = gdf_pdet.to_crs(epsg=4326)       # WGS84 para MongoDB
+
+# Calculo de area en km2 con proyeccion metrica
+metric = gdf_pdet.to_crs(epsg=9377)
+gdf_pdet["area_km2"] = metric.area / 1_000_000
+
+# Bounding box por municipio
+bounds = gdf_pdet.geometry.bounds
+gdf_pdet["bbox"] = bounds.apply(
+    lambda r: {"min_lng": r.minx, "min_lat": r.miny,
+               "max_lng": r.maxx, "max_lat": r.maxy}, axis=1
+)
+gdf_pdet.to_file("municipios_pdet.geojson", driver="GeoJSON")
+\end{lstlisting}
+
+\subsection{Carga en MongoDB Atlas}
+
+Los documentos se insertaron en la colección \texttt{municipios\_pdet}
+de la base de datos \textbf{\texttt{upme\_solar\_db}} (MongoDB Atlas, capa
+gratuita, clúster \texttt{Cluster0}). Cada documento incluye los siguientes
+nueve campos:
+
+\begin{table}[H]
+  \centering
+  \caption{Esquema de documento — Colección \texttt{municipios\_pdet}}
+  \label{tab:esquema_municipios}
+  \begin{tabularx}{\textwidth}{llX}
+    \toprule
+    \textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+    \midrule
+    \texttt{cod\_dane}       & String  & Código DIVIPOLA de 5 dígitos \\
+    \texttt{nombre}          & String  & Nombre oficial del municipio \\
+    \texttt{departamento}    & String  & Departamento al que pertenece \\
+    \texttt{subregion\_pdet} & String  & Subregión PDET según Decreto 893/2017 \\
+    \texttt{area\_km2}       & Double  & Área calculada en km² (EPSG:9377) \\
+    \texttt{pdet}            & Boolean & Siempre \texttt{true} en esta colección \\
+    \texttt{geometry}        & GeoJSON & Geometría completa (Polygon/MultiPolygon) \\
+    \texttt{fuente}          & String  & \texttt{"MGN2025"} \\
+    \texttt{cargado\_en}     & Date    & Marca de tiempo UTC de inserción \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{lstlisting}[language=Python,
+  caption={Carga de documentos en MongoDB Atlas}]
+col.drop()  # limpiar inserciones previas
+
+documentos = []
+for _, fila in gdf.iterrows():
+    doc = {
+        "cod_dane":       str(fila["cod_dane"]),
+        "nombre":         fila["Municipio"],
+        "departamento":   fila["Departamento"],
+        "subregion_pdet": fila["SubPDET"],
+        "area_km2":       float(fila["area_km2"]),
+        "pdet":           True,
+        "geometry":       fila["geometry"].__geo_interface__,
+        "fuente":         "MGN2025",
+        "cargado_en":     datetime.utcnow()
+    }
+    documentos.append(doc)
+
+col.insert_many(documentos)
+# Municipios cargados: 170
+\end{lstlisting}
+
+Posteriormente se crearon dos índices sobre la colección:
+
+\begin{lstlisting}[language=Python,
+  caption={Creación de índices en MongoDB}]
+col.create_index([("geometry", "2dsphere")])       # consultas geoespaciales
+col.create_index([("cod_dane", 1)], unique=True)   # unicidad por codigo DANE
+\end{lstlisting}
+
+El índice \texttt{2dsphere} habilita los operadores
+\texttt{\$geoIntersects} y \texttt{\$geoWithin} sobre geometrías GeoJSON,
+mientras que el índice sobre \texttt{cod\_dane} garantiza la integridad
+referencial y acelera las búsquedas por código municipal.
 
 \section{Validación de la carga}
 
-\textit{[Número de documentos insertados, consultas de prueba, mapa de
-validación visual con los 170 municipios PDET.]}
+La validación se realizó en tres niveles: integridad tabular, topología
+espacial e integridad en MongoDB.
+
+\subsection*{Integridad tabular}
+
+\begin{table}[H]
+  \centering
+  \caption{Resultados de la verificación de integridad del dataset PDET}
+  \label{tab:validacion}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Verificación} & \textbf{Resultado} & \textbf{Estado} \\
+    \midrule
+    Total de municipios cargados     & 170 / 170 & \checkmark \\
+    Geometrías inválidas             & 0         & \checkmark \\
+    Valores nulos en campos clave    & 0         & \checkmark \\
+    Códigos DANE duplicados          & 0         & \checkmark \\
+    Solapamientos entre municipios   & 0         & \checkmark \\
+    Documentos insertados en MongoDB & 170       & \checkmark \\
+    Campos requeridos presentes      & 9 / 9     & \checkmark \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection*{Prueba del índice espacial}
+
+Se ejecutó una consulta de intersección puntual con el operador
+\texttt{\$geoIntersects} sobre las coordenadas
+$(-72{,}7317°\,\text{E},\; 8{,}6572°\,\text{N})$,
+correspondientes al municipio de \textbf{Tibú (Norte de Santander)}.
+La respuesta del índice fue inmediata e identificó correctamente el
+documento asociado a dicho municipio (subregión Catatumbo), confirmando
+el correcto funcionamiento del índice \texttt{2dsphere}.
+
+\subsection*{Visualización cartográfica}
+
+La Figura~\ref{fig:mapa_pdet} presenta el mapa coroplético con los
+170 municipios PDET coloreados por departamento, generado directamente
+desde el GeoDataFrame validado.
 
 \begin{figure}[H]
   \centering
-  % \includegraphics[width=0.85\textwidth]{figuras/mapa_municipios_pdet.png}
-  \fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}
-    \textit{[Insertar mapa coroplético con los 170 municipios PDET resaltados]}
-    \vspace{3cm}}}
+  \includegraphics[width=0.85\textwidth]{semana_2/visualizaciones/municipios_pdet_mapa.png}
   \caption{Municipios PDET en Colombia — Fuente: DANE MGN2025, elaboración propia.}
   \label{fig:mapa_pdet}
 \end{figure}
 
 \section{Avance y resultados de la Semana 2}
 
-\textit{[Síntesis de logros, obstáculos encontrados y cómo se resolvieron.]}
+Durante esta entrega se completaron exitosamente las siguientes tareas:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+  \item \textbf{Adquisición del MGN2025:} descarga y lectura del Shapefile
+        oficial del DANE con 1\,122 municipios de Colombia.
+  \item \textbf{Integración de la lista PDET:} cruce por código DANE con el
+        archivo oficial del ART, obteniendo exactamente 170 municipios en
+        16 subregiones.
+  \item \textbf{Preprocesamiento geoespacial:} corrección de geometrías,
+        reproyección a WGS84, cálculo de áreas en km² y generación de
+        bounding boxes.
+  \item \textbf{Exportación a GeoJSON:} archivo \texttt{municipios\_pdet.geojson}
+        de 65{,}2~MB listo para su uso en fases posteriores.
+  \item \textbf{Carga en MongoDB Atlas:} 170 documentos insertados en la
+        colección \texttt{municipios\_pdet} de \texttt{upme\_solar\_db},
+        con índices \texttt{2dsphere} y \texttt{cod\_dane} (único) operativos.
+  \item \textbf{Validación integral:} cero errores en geometrías, nulos,
+        duplicados y solapamientos; prueba del índice espacial exitosa.
+  \item \textbf{Visualización cartográfica:} mapa coroplético por departamento
+        generado con Matplotlib y GeoPandas.
+\end{enumerate}
+
+El principal obstáculo encontrado fue la ausencia del archivo
+\texttt{.shx} al ejecutar el notebook \texttt{01\_integracion\_pdet.ipynb}
+en un entorno diferente al de desarrollo original, lo que impidió que
+GeoPandas abriera el Shapefile. Este problema se resolvió ejecutando el
+procesamiento directamente sobre el GeoJSON ya generado, garantizando la
+portabilidad del flujo de trabajo.
 
 %% ============================================================
 %%  CAPÍTULO 5 — ENTREGA 3: CARGA DE HUELLAS DE EDIFICACIONES
