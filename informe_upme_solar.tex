@@ -360,9 +360,14 @@ edificaciones en tiempos razonables.
 
 \section{Plan de implementación}
 
-\textit{[Describir la arquitectura general: tecnologías seleccionadas, entorno
-de desarrollo (local/nube), herramientas de ETL, lenguajes de programación
-y bibliotecas geoespaciales (PyMongo, Shapely, GeoPandas, etc.)]}
+El proyecto se ejecuta sobre una arquitectura de base de datos documental alojada en
+\textbf{MongoDB Atlas} (capa gratuita, clúster \texttt{Cluster0}, región US-East),
+accedida desde un entorno local de Python~3.13. El procesamiento geoespacial se
+realiza con GeoPandas y Shapely; la conexión a MongoDB, con PyMongo~4.x. Los
+notebooks de Jupyter Lab documentan cada etapa del flujo de manera reproducible y
+permiten la regeneración de todos los resultados a partir de los datos crudos.
+El control de versiones y la entrega de todos los artefactos del proyecto se gestionan
+con Git y GitHub.
 
 \subsection{Pila tecnológica}
 
@@ -374,11 +379,12 @@ y bibliotecas geoespaciales (PyMongo, Shapely, GeoPandas, etc.)]}
     \toprule
     \textbf{Componente} & \textbf{Descripción} & \textbf{Versión} \\
     \midrule
-    Base de datos        & MongoDB Atlas (nube, clúster compartido) & 7.x \\
+    Base de datos        & MongoDB Atlas (nube, clúster M0 compartido) & 7.x \\
     Lenguaje principal   & Python & 3.13 \\
-    Geoprocesamiento     & GeoPandas / Shapely / PyOGRIO & latest \\
-    Driver NoSQL         & PyMongo & latest \\
-    Visualización        & Matplotlib & latest \\
+    Procesamiento geo    & GeoPandas / Shapely & latest \\
+    Driver NoSQL         & PyMongo & 4.x \\
+    Notebooks            & Jupyter Lab & latest \\
+    Visualización        & Folium / Matplotlib & latest \\
     Control de versiones & Git / GitHub & — \\
     \bottomrule
   \end{tabularx}
@@ -386,45 +392,174 @@ y bibliotecas geoespaciales (PyMongo, Shapely, GeoPandas, etc.)]}
 
 \section{Modelado de datos}
 
-\textit{[Presentar el modelo conceptual: entidades principales
-(Municipio, EdificaciónMicrosoft, EdificaciónGoogle), relaciones y
-cardinalidades.]}
+La base de datos \texttt{upme\_solar\_db} contiene tres colecciones cuyo diseño
+parte del principio de separación de roles: una colección territorial de referencia
+y dos colecciones de footprints, una por cada fuente de datos.
+
+\begin{table}[H]
+  \centering
+  \caption{Colecciones de la base de datos \texttt{upme\_solar\_db}}
+  \label{tab:colecciones}
+  \begin{tabularx}{\textwidth}{llXr}
+    \toprule
+    \textbf{Colección} & \textbf{Fuente} & \textbf{Rol en el proyecto} & \textbf{Docs aprox.} \\
+    \midrule
+    \texttt{municipios\_pdet} & DANE / MGN 2025      & Polígonos de referencia territorial & $\approx$170 \\
+    \texttt{ms\_buildings}    & Microsoft Bing Maps  & Footprints de edificios — Dataset 1 & Millones \\
+    \texttt{goo\_buildings}   & Google Open Bldgs V3 & Footprints de edificios — Dataset 2 & Millones \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Las colecciones de edificaciones no referencian directamente a \texttt{municipios\_pdet}
+mediante claves foráneas; la relación se establece en tiempo de consulta mediante
+operaciones \texttt{\$geoIntersects} sobre los índices espaciales \texttt{2dsphere}.
+El campo \texttt{cod\_dane\_municipio} se inicializa en \texttt{null} y se asigna
+durante el análisis espacial de la Semana~4.
 
 \section{Diseño del esquema}
 
-\textit{[Mostrar el esquema de documentos en formato JSON/BSON para cada
-colección. Justificar decisiones de embedding vs. referencing.]}
+El modelo adopta un diseño minimalista orientado a las consultas espaciales. Las
+decisiones de diseño más importantes son:
 
-\begin{lstlisting}[language=Python, caption={Esquema documento — Colección \texttt{municipios\_pdet}}]
+\begin{itemize}
+  \item \textbf{Sin embedding de estadísticas:} los conteos y áreas de techumbres
+        no se embeben en \texttt{municipios\_pdet}; se calculan en tiempo de consulta
+        con el aggregation pipeline, evitando actualizaciones costosas al cargar
+        nuevos footprints.
+  \item \textbf{Sin referencia cruzada rígida:} \texttt{cod\_dane\_municipio} en
+        las colecciones de edificaciones inicia en \texttt{null} y se asigna en
+        el análisis de la Semana~4, lo que permite cargar los datasets
+        independientemente del orden.
+\end{itemize}
+
+\begin{lstlisting}[caption={Esquema --- Coleccion \texttt{municipios\_pdet}}]
 {
-  "_id": ObjectId("..."),
-  "cod_divipola": "05001",
-  "nombre": "Medellín",
-  "departamento": "Antioquia",
-  "es_pdet": true,
-  "subregion_pdet": "Bajo Cauca y Nordeste Antioqueño",
-  "geometry": {
-    "type": "Polygon",
-    "coordinates": [[ [lng1, lat1], [lng2, lat2], ... ]]
+  "_id":            ObjectId,
+  "cod_dane":       "05001",      // Codigo DANE - 5 digitos, indice unico
+  "nombre":         "Medellin",
+  "departamento":   "Antioquia",
+  "pdet":           true,         // Siempre true en esta coleccion
+  "subregion_pdet": "Bajo Cauca y Nordeste Antioqueno",
+  "area_km2":       380.64,       // Calculada con GeoPandas (EPSG:9377)
+  "geometry": {                   // Campo indexado 2dsphere
+    "type": "MultiPolygon",
+    "coordinates": [ [ [ [lng, lat], ... ] ] ]
   },
-  "estadisticas": {
-    "num_edificaciones_ms": null,
-    "area_total_m2_ms": null,
-    "num_edificaciones_google": null,
-    "area_total_m2_google": null
-  }
+  "bbox": {                       // Bounding box precalculado
+    "min_lng": -75.62, "max_lng": -75.51,
+    "min_lat":   6.18, "max_lat":   6.34
+  },
+  "fuente":     "MGN2025",
+  "cargado_en": ISODate("2025-XX-XX")
 }
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Esquema --- Coleccion \texttt{ms\_buildings}}]
+{
+  "_id": ObjectId,
+  "geometry": {                   // Campo indexado 2dsphere
+    "type": "Polygon",
+    "coordinates": [ [ [lng, lat], ... ] ]
+  },
+  "area_m2":            142.87,   // Calculada con GeoPandas (EPSG:9377)
+  "cod_dane_municipio": null,     // Asignado en analisis Semana 4
+  "fuente":             "microsoft",
+  "cargado_en":         ISODate("2025-XX-XX")
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Esquema --- Coleccion \texttt{goo\_buildings}}]
+{
+  "_id": ObjectId,
+  "geometry": {                   // Campo indexado 2dsphere
+    "type": "Polygon",
+    "coordinates": [ [ [lng, lat], ... ] ]
+  },
+  "area_m2":            98.34,    // Tomado del campo area_in_meters del CSV
+  "confidence":          0.872,   // Score de confianza [0.0 - 1.0]
+  "cod_dane_municipio":  null,    // Asignado en analisis Semana 4
+  "fuente":             "google",
+  "cargado_en":         ISODate("2025-XX-XX")
+}
+\end{lstlisting}
+
+Los índices definidos para las tres colecciones son:
+
+\begin{lstlisting}[caption={Indices definidos en \texttt{upme\_solar\_db}}]
+// municipios_pdet
+db.municipios_pdet.createIndex({ geometry: "2dsphere" })
+db.municipios_pdet.createIndex({ cod_dane: 1 }, { unique: true })
+
+// ms_buildings
+db.ms_buildings.createIndex({ geometry: "2dsphere" })
+db.ms_buildings.createIndex({ cod_dane_municipio: 1 })
+
+// goo_buildings
+db.goo_buildings.createIndex({ geometry: "2dsphere" })
+db.goo_buildings.createIndex({ cod_dane_municipio: 1 })
+db.goo_buildings.createIndex({ confidence: -1 })
 \end{lstlisting}
 
 \section{Justificación de la solución NoSQL}
 
-\textit{[Argumentar por qué la solución NoSQL seleccionada es apropiada
-para este caso de uso frente a alternativas relacionales.]}
+Se seleccionó MongoDB como motor NoSQL frente a las alternativas evaluadas
+(Couchbase, Cassandra y Elasticsearch) por cinco razones técnicas:
+
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{Compatibilidad nativa con GeoJSON:} los tres datasets candidatos
+        distribuyen sus datos en formato GeoJSON, que MongoDB almacena y consulta
+        de forma nativa sin transformaciones intermedias.
+  \item \textbf{Índice \texttt{2dsphere}:} diseñado específicamente para geometrías
+        sobre la superficie terrestre, habilita \texttt{\$geoIntersects} y
+        \texttt{\$geoWithin} directamente en el motor.
+  \item \textbf{Ecosistema Python:} PyMongo integra MongoDB con GeoPandas, Shapely
+        y Jupyter Lab, las herramientas centrales del flujo de trabajo.
+  \item \textbf{Esquema flexible:} los footprints de edificios tienen atributos
+        variables según la fuente (Microsoft no incluye \texttt{confidence};
+        Google sí). Un esquema documental evita migraciones rígidas al comparar
+        fuentes heterogéneas.
+  \item \textbf{Escalabilidad:} MongoDB puede distribuirse en clúster para manejar
+        cientos de millones de registros sin cambiar la API de consulta.
+\end{enumerate}
+
+\begin{table}[H]
+  \centering
+  \caption{Comparación de motores NoSQL evaluados}
+  \label{tab:motores_nosql}
+  \begin{tabularx}{\textwidth}{llll}
+    \toprule
+    \textbf{Motor NoSQL} & \textbf{Soporte geo} & \textbf{Curva aprend.} & \textbf{Veredicto} \\
+    \midrule
+    MongoDB       & Nativo (\texttt{2dsphere})  & Baja       & \textbf{Seleccionado} \\
+    Couchbase     & Parcial (N1QL)               & Media      & Descartado \\
+    Cassandra     & No nativo                   & Alta       & Descartado \\
+    Elasticsearch & \texttt{geo\_shape}          & Media-alta & Descartado \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
 \section{Avance y resultados de la Semana 1}
 
-\textit{[Resumir lo logrado: repositorio creado, esquema implementado,
-colecciones creadas, índices definidos.]}
+Durante esta primera entrega se completaron las siguientes tareas:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+  \item \textbf{Selección del motor NoSQL:} MongoDB~7.x en Atlas, justificado por
+        su soporte nativo de índices \texttt{2dsphere} y compatibilidad directa
+        con GeoJSON.
+  \item \textbf{Selección de datasets:} Microsoft Building Footprints y Google Open
+        Buildings~V3. El dataset GlobalBuildingAtlas (TUM) fue descartado por su
+        licencia restrictiva (Commons Clause) y la complejidad de sus modelos~3D.
+  \item \textbf{Diseño del modelo de datos:} tres colecciones definidas
+        (\texttt{municipios\_pdet}, \texttt{ms\_buildings}, \texttt{goo\_buildings})
+        con sus esquemas de documento, campos obligatorios e índices espaciales.
+  \item \textbf{Plan de implementación:} flujo de trabajo de cuatro etapas
+        documentado —adquisición, carga, análisis y reporte— con cronograma semanal
+        alineado a las fechas de entrega del curso.
+  \item \textbf{Repositorio Git:} inicializado con la estructura de carpetas del
+        proyecto y los dos documentos entregables de la semana~1
+        (\textit{Modelado de Datos NoSQL} y \textit{Plan de Implementación NoSQL}).
+\end{enumerate}
 
 %% ============================================================
 %%  CAPÍTULO 4 — ENTREGA 2: INTEGRACIÓN DE LÍMITES PDET
