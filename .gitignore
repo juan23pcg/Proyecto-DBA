@@ -1,0 +1,22 @@
+# Datos pesados
+*.csv
+*.csv.gz
+*.geojson
+*.shp
+*.dbf
+*.shx
+*.cpg
+*.prj
+*.geojson.gz
+
+# Carpetas de datos
+datos/raw/
+datos/processed/
+
+# Python
+__pycache__/
+.ipynb_checkpoints/
+
+# Entornos
+venv/
+.env
