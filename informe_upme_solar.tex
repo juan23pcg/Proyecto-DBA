@@ -21,6 +21,7 @@
 \usepackage{float}
 \usepackage{subcaption}
 \usepackage{tikz}
+\usetikzlibrary{arrows.meta, shapes.geometric, positioning, calc}
 
 % Tablas
 \usepackage{booktabs}
@@ -58,6 +59,10 @@
 % Espaciado entre líneas
 \usepackage{setspace}
 \onehalfspacing
+
+% Notas de pendientes por integrante
+\usepackage[colorinlistoftodos, textsize=small, spanish]{todonotes}
+\newcommand{\pendiente}[2][]{\todo[inline, color=orange!30, #1]{\textbf{PENDIENTE — #2}}}
 
 % Para cronograma / Gantt (opcional)
 % \usepackage{pgfgantt}
@@ -847,82 +852,356 @@ portabilidad del flujo de trabajo.
 \label{cap:entrega3}
 
 \begin{semanabox}[Entrega 3]{3}
-  \textbf{Objetivo:} Adquirir, cargar y realizar un análisis exploratorio
-  de los conjuntos de datos de edificaciones seleccionados.\\
-  \textbf{Fecha de entrega:} Semana 3, antes de las 14:00 h.
+  \textbf{Objetivo:} Adquirir, cargar en MongoDB Atlas y realizar un
+  análisis exploratorio de los conjuntos de datos de huellas de
+  edificaciones seleccionados para los 170 municipios PDET.\\
+  \textbf{Fecha de entrega:} Semana 3, antes de las 14:00~h.
 \end{semanabox}
 
+% ── 5.1 ────────────────────────────────────────────────────────
 \section{Datasets seleccionados}
 
-Para este proyecto se seleccionaron los siguientes dos conjuntos de datos:
+Se evaluaron tres fuentes de huellas de edificaciones de cobertura
+global. Finalmente se seleccionaron dos:
 
 \begin{enumerate}
-  \item \textbf{Microsoft Building Footprints} \parencite{microsoft2023buildings}
-  \item \textbf{Google Open Buildings v3} \parencite{sirko2021continental}
+  \item \textbf{Microsoft Building Footprints}
+    \parencite{microsoft2023buildings}: dataset de acceso abierto
+    (licencia ODbL) derivado de modelos de visión por computadora
+    entrenados sobre imágenes aéreas y satelitales de alta resolución.
+    Distribuido por país/región en archivos \texttt{CSV.gz} accesibles
+    mediante URLs públicas organizadas por \textit{QuadKey}.
+    Para Colombia se identificaron 233~tiles; de estos, 16~intersectan
+    con los municipios PDET (ver \texttt{tiles\_pdet.csv}).
+
+  \item \textbf{Google Open Buildings~v3}
+    \parencite{sirko2021continental}: dataset global derivado de imágenes
+    satelitales de alta resolución con una estimación de confianza por
+    polígono (\texttt{confidence}). Licencia CC~BY~4.0 / ODbL según el
+    tile. Disponible en archivos CSV por cuadrículas ~S2 globales.
 \end{enumerate}
 
-\textit{[Justificar brevemente la selección y descartar el tercero si aplica.]}
+Se descartó \textbf{GlobalBuildingAtlas (TUM)} por las mayores
+restricciones de acceso al dataset completo y la complejidad de integración
+con PyMongo en el plazo disponible. La decisión se detalla en la
+Sección~\ref{subsec:gdba}.
 
+% ── 5.2 ────────────────────────────────────────────────────────
 \section{Dataset 1: Microsoft Building Footprints}
 
 \subsection{Adquisición}
+\label{subsec:ms_adquisicion}
 
-\textit{[Describir el proceso de descarga: Planetary Computer, archivos
-GeoParquet por país, volumen total para Colombia.]}
+Microsoft distribuye su dataset de huellas de edificaciones de forma pública
+a través de un índice CSV alojado en Azure Blob Storage. El índice contiene
+una fila por \textit{tile}, con la URL de descarga directa del archivo
+comprimido (\texttt{.csv.gz}) y su tamaño.
+
+\paragraph{Identificación de tiles para Colombia.}
+Se descargó el índice global y se filtró por \texttt{Location = Colombia},
+obteniendo \textbf{232~tiles} con un volumen comprimido total de
+aproximadamente \textbf{647~MB}. Cada tile está identificado por un
+\textit{QuadKey}~\cite{microsoft2023buildings}, una cadena numérica que
+codifica una celda de la cuadrícula de mapas de Bing en zoom~9
+(celdas de $\approx$18~km de lado a la latitud de Colombia).
+El resultado se guardó en
+\texttt{semana\_3/datos/raw/microsoft/tiles\_index.csv} (232~filas).
+
+\paragraph{Filtrado a municipios PDET.}
+Para limitar la descarga al área de interés se realizó una intersección
+espacial entre la extensión territorial (\textit{bounding box}) de los
+170~municipios PDET y las celdas QuadKey de Colombia.
+Resultaron \textbf{16~tiles} relevantes, con un tamaño comprimido
+acumulado de \textbf{0.7~MB}. El subconjunto se registró en
+\texttt{semana\_3/datos/raw/microsoft/tiles\_pdet.csv}.
+Los QuadKeys seleccionados fueron:
+
+\begin{center}
+\small
+\texttt{210010100}, \texttt{210010101}, \texttt{210010110},
+\texttt{210010111}, \texttt{210010112}, \texttt{210010113},
+\texttt{210011000}, \texttt{210011001}, \texttt{210011002},
+\texttt{210011003}, \texttt{210011010}, \texttt{210011011},
+\texttt{210011012}, \texttt{210011013}, \texttt{210011100},
+\texttt{210011102}
+\end{center}
+
+\paragraph{Descarga y preprocesamiento.}
+Los 16~archivos \texttt{.csv.gz} se descargaron directamente desde las
+URLs registradas en el índice
+(\url{https://minedbuildings.z5.web.core.windows.net/global-buildings/}),
+se descomprimieron y concatenaron.
+Las geometrías originales vienen en formato WKT
+(\textit{Well-Known Text}); en el paso de limpieza se convirtieron a
+GeoJSON (diccionario Python serializado como cadena JSON) para
+compatibilidad directa con PyMongo~4.x.
+El resultado final, tras descartar una fila con geometría no parseable,
+fue \textbf{5\,258~registros} en el archivo
+\texttt{microsoft\_pdet\_limpio.csv} (2.1~MB).
+Los datos corresponden al índice publicado el \textbf{3~de febrero de 2026}
+(campo \texttt{UploadDate}: 2026-02-23).
 
 \subsection{Formato y estructura}
+\label{subsec:ms_formato}
 
-\textit{[Describir las columnas del dataset: geometry, confidence, etc.
-Incluir tabla de metadatos.]}
-
-\subsection{Carga en NoSQL}
-
-\textit{[Estrategia de particionamiento, tiempos de carga, índices creados.]}
-
-\subsection{Análisis exploratorio (EDA)}
-
-\textit{[Estadísticas básicas: total de edificaciones en Colombia, distribución
-de áreas, histogramas, comparación urbano/rural.]}
-
-\section{Dataset 2: Google Open Buildings}
-
-\subsection{Adquisición}
-
-\textit{[Tiles descargados, formato CSV/GeoJSON, identificación de tiles
-que intersectan con bounding box de Colombia.]}
-
-\subsection{Carga en NoSQL e índices espaciales}
-
-\textit{[Mismo esquema que Dataset 1.]}
-
-\subsection{Análisis exploratorio (EDA)}
-
-\textit{[Comparar cobertura y características con Microsoft.]}
-
-\section{Comparación preliminar de datasets}
+El archivo procesado \texttt{microsoft\_pdet\_limpio.csv} contiene
+\textbf{4~columnas} y \textbf{5\,258~filas} (sin encabezado).
+No presenta valores nulos en ningún campo.
 
 \begin{table}[H]
   \centering
-  \caption{Comparación de datasets de edificaciones para Colombia}
-  \label{tab:comparacion_datasets}
-  \begin{tabularx}{\textwidth}{lXX}
+  \caption{Metadatos del dataset Microsoft Building Footprints
+           (subconjunto municipios PDET)}
+  \label{tab:ms_metadatos}
+  \begin{tabularx}{\textwidth}{llXl}
     \toprule
-    \textbf{Aspecto} & \textbf{Microsoft} & \textbf{Google} \\
+    \textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} & \textbf{Rango / valores} \\
     \midrule
-    Total edificaciones (Colombia) & & \\
-    Tamaño en disco               & & \\
-    Año de imágenes               & 2014–2021 & \textit{[x]} \\
-    Atributos de área             & & \\
-    Licencia                      & ODbL & CC BY-4.0 / ODbL \\
-    Tiempo de carga               & & \\
+    \texttt{geometry}  & \texttt{str}   &
+      Polígono de la huella en formato GeoJSON serializado como cadena JSON.
+      Coordenadas en WGS-84 (EPSG:4326). &
+      — \\
+    \texttt{area\_m2}  & \texttt{float} &
+      Área del polígono en metros cuadrados, calculada con Shapely
+      sobre la proyección plana local. &
+      11.43 – 3\,754.71~m² \\
+    \texttt{height}    & \texttt{float} &
+      Altura estimada de la edificación en metros.
+      El valor \texttt{-1.0} indica que la altura no está disponible. &
+      $-1.0$ (100\,\% de registros) \\
+    \texttt{fuente}    & \texttt{str}   &
+      Etiqueta de origen del registro. Valor constante en todo el archivo. &
+      \texttt{"microsoft"} \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
+\noindent
+La Tabla~\ref{tab:ms_stats} resume las estadísticas descriptivas del
+campo \texttt{area\_m2}, que es el único atributo numérico informativo
+(el campo \texttt{height} está vacío para todos los tiles PDET disponibles
+en la versión de febrero de 2026 del dataset).
+
+\begin{table}[H]
+  \centering
+  \caption{Estadísticas descriptivas de \texttt{area\_m2} ---
+           colección \texttt{ms\_buildings} ($n = 5\,258$)}
+  \label{tab:ms_stats}
+  \begin{tabular}{lr}
+    \toprule
+    \textbf{Estadístico} & \textbf{Valor (m²)} \\
+    \midrule
+    Mínimo   & 11.43  \\
+    Máximo   & 3\,754.71 \\
+    Media    & 133.54 \\
+    \midrule
+    Total registros cargados en MongoDB & 5\,258 \\
+    Registros descartados (error parseo) & 1 \\
+    Nulos en cualquier campo            & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\noindent
+Estos 5\,258~documentos quedan almacenados en la colección
+\texttt{ms\_buildings} de la base de datos \texttt{upme\_solar\_db}
+en MongoDB~8.x (instancia local). El proceso de carga e indexación
+se detalla en la sección~\ref{subsec:ms_carga}.
+
+\subsection{Carga en NoSQL}
+\label{subsec:ms_carga}
+
+\pendiente{Juan Pablo — documentar la estrategia de inserción por
+lotes (\textit{batch size}~= 1\,000), el manejo de geometrías
+(limpieza de comillas escapadas en el JSON de geometría),
+el tiempo total de carga, y los índices creados en la colección
+\texttt{ms\_buildings}:
+\texttt{geometry~2dsphere} y \texttt{cod\_dane\_municipio~1}.
+Resultado final: \textbf{5\,258 documentos} insertados
+(1 fila descartada por error de parseo).}
+
+\subsection{Análisis exploratorio (EDA)}
+\label{subsec:ms_eda}
+
+\pendiente{Juan Pablo — reportar las estadísticas de la colección
+\texttt{ms\_buildings} obtenidas mediante aggregation pipeline:
+área mínima~11.4~m², media~133.5~m², máxima~3\,754.7~m²;
+área total~702\,146~m². Incluir histograma de distribución de áreas,
+listado de los 5~municipios PDET con mayor número de edificaciones
+según este dataset, y validación del índice espacial con una consulta
+\texttt{\$geoIntersects} de prueba.}
+
+% ── 5.3 ────────────────────────────────────────────────────────
+\section{Dataset 2: Google Open Buildings}
+
+\subsection{Adquisición}
+\label{subsec:goo_adquisicion}
+
+\pendiente{Jineth — describir el proceso de selección de tiles S2
+por bounding box de los municipios PDET colombianos, la descarga
+de los archivos CSV desde la URL pública de Google,
+y el filtrado espacial que redujo el dataset al subconjunto
+de edificaciones dentro de los 170 municipios PDET.
+Indicar volumen total descargado y número de tiles procesados.
+Tamaño del archivo resultante: \texttt{google\_pdet\_filtrado.csv} → 576~MB,
+2\,263\,447 filas (incluyendo encabezado).}
+
+\subsection{Carga en NoSQL e índices espaciales}
+\label{subsec:goo_carga}
+
+\pendiente{Jineth — documentar la estrategia de inserción por chunks
+de 10\,000 filas con \texttt{pd.read\_csv(..., chunksize=10000)},
+la conversión de geometrías WKT→GeoJSON con Shapely,
+la corrección de 309\,598 códigos DANE de 4 dígitos
+(prefijo ``0'' faltante, corregido vía \texttt{update\_many}),
+el tiempo total de carga, y los tres índices creados:
+\texttt{geometry~2dsphere}, \texttt{cod\_dane\_municipio~1},
+\texttt{confidence~-1}.
+Resultado final: \textbf{2\,263\,446 documentos} en la colección
+\texttt{goo\_buildings}.}
+
+\subsection{Análisis exploratorio (EDA)}
+\label{subsec:goo_eda}
+
+\pendiente{Jineth — reportar las estadísticas de la colección
+\texttt{goo\_buildings}: área mínima~2.5~m², media~91.7~m²,
+máxima~20\,916.7~m²; área total~207\,447\,099~m².
+Distribución por nivel de confianza:
+$[0.7,0.8)$: 1\,146\,865 edif.;
+$[0.8,0.9)$: 1\,040\,098 edif.;
+$[0.9,1.0]$: 76\,483 edif.
+Top~5 municipios PDET (corregido): Santa Marta~154\,601,
+Valledupar~141\,586, Buenaventura~88\,341, Turbo~66\,587,
+Florencia~48\,674.
+Incluir histograma de áreas y comparación de cobertura con Microsoft.}
+
+% ── 5.4 ────────────────────────────────────────────────────────
+\section{Comparación preliminar de datasets}
+\label{sec:comparacion_datasets}
+
+La Tabla~\ref{tab:comparacion_datasets} compara las principales
+características de ambos datasets en el subconjunto restringido a los
+170~municipios PDET. Los conteos de documentos provienen de la colección
+MongoDB \texttt{upme\_solar\_db} ejecutada en la Semana~3; los tamaños
+de los archivos CSV procesados se midieron en disco local; los tiempos
+de carga y el año de imágenes de Google requieren confirmación de los
+responsables respectivos.
+
+\begin{table}[H]
+  \centering
+  \caption{Comparación de datasets de huellas de edificaciones ---
+           subconjunto municipios PDET (170 municipios)}
+  \label{tab:comparacion_datasets}
+  \begin{tabularx}{\textwidth}{lXX}
+    \toprule
+    \textbf{Aspecto}
+      & \textbf{Microsoft Building Footprints}
+      & \textbf{Google Open Buildings~v3} \\
+    \midrule
+    Total edificaciones (PDET)
+      & 5\,258 documentos en \texttt{ms\_buildings}
+      & 2\,263\,446 documentos en \texttt{goo\_buildings} \\[4pt]
+    Tamaño archivo CSV procesado
+      & 2.1~MB (\texttt{microsoft\_pdet\_limpio.csv}, 5\,258 filas)
+      & 576~MB (\texttt{google\_pdet\_filtrado.csv}, 2\,263\,447 filas) \\[4pt]
+    Tamaño colección en MongoDB
+      & \todo{PENDIENTE: Sara — ejecutar \texttt{collStats} sobre \texttt{ms\_buildings} con MongoDB activo}
+      & \todo{PENDIENTE: Sara — ejecutar \texttt{collStats} sobre \texttt{goo\_buildings} con MongoDB activo} \\[4pt]
+    Año de imágenes
+      & 2014–2021
+      & \todo{PENDIENTE: Jineth — confirmar año de captura de imágenes de Google OB~v3} \\[4pt]
+    Tiene atributo área
+      & Sí (\texttt{area\_m2}, calculado con Shapely)
+      & Sí (\texttt{area\_in\_meters}, provisto por Google) \\[4pt]
+    Licencia
+      & ODbL
+      & CC~BY~4.0 / ODbL (según tile) \\[4pt]
+    Tiempo de carga
+      & \todo{PENDIENTE: Juan Pablo — registrar tiempo de carga de \texttt{ms\_buildings}}
+      & \todo{PENDIENTE: Jineth — registrar tiempo de carga de \texttt{goo\_buildings}} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ── 5.5 ────────────────────────────────────────────────────────
 \section{Avance y resultados de la Semana 3}
 
-\textit{[Síntesis: número total de documentos cargados por dataset,
-desafíos de ETL, tiempos, métricas de calidad de datos.]}
+Durante la Semana~3 se completó la adquisición, preprocesamiento y carga en
+MongoDB de los dos datasets de huellas de edificaciones seleccionados,
+alcanzando un total de \textbf{2\,268\,704~documentos geoespaciales}
+indexados en \texttt{upme\_solar\_db}.
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+  \item \textbf{Carga de Microsoft Building Footprints:}
+        se descargaron y procesaron 16~tiles QuadKey (de 232~disponibles para
+        Colombia), obteniendo 5\,259~filas en \texttt{microsoft\_pdet\_limpio.csv}
+        (2.1~MB). Tras descartar 1~fila con geometría no parseable, se
+        insertaron \textbf{5\,258~documentos} en la colección
+        \texttt{ms\_buildings} con índices
+        \texttt{geometry~2dsphere} y \texttt{cod\_dane\_municipio}.
+        \todo{PENDIENTE: Juan Pablo — reportar el tiempo total de carga.}
+
+  \item \textbf{Carga de Google Open Buildings~v3:}
+        se procesaron \textbf{576~MB} de datos CSV
+        (\texttt{google\_pdet\_filtrado.csv}, 2\,263\,447~filas) mediante
+        inserción por chunks de 10\,000~registros.
+        Se cargaron \textbf{2\,263\,446~documentos} en \texttt{goo\_buildings}
+        con índices \texttt{geometry~2dsphere}, \texttt{cod\_dane\_municipio}
+        e \texttt{confidence}.
+        \todo{PENDIENTE: Jineth — reportar el tiempo total de carga.}
+
+  \item \textbf{Corrección de integridad — códigos DANE:}
+        se detectaron y corrigieron \textbf{309\,598~documentos} en
+        \texttt{goo\_buildings} con código DANE de 4~dígitos
+        (prefijo \texttt{"0"} ausente), mediante una operación
+        \texttt{update\_many} con \texttt{\$concat}.
+        Tras la corrección, la validación cruzada con \texttt{municipios\_pdet}
+        retornó 0~códigos huérfanos de 4~dígitos.
+
+  \item \textbf{Validación espacial:}
+        la prueba de intersección con el punto de referencia de Tibú
+        (Norte de Santander) devolvió el municipio correcto en ambas
+        colecciones, confirmando el funcionamiento de los índices
+        \texttt{2dsphere}~($\checkmark$).
+
+  \item \textbf{Métricas de calidad:}
+        tasa de error en Microsoft $< 0.02\,\%$
+        (1~fila descartada de 5\,259);
+        \todo{PENDIENTE: Jineth — reportar tasa de error en Google
+              (filas descartadas de 2\,263\,447).}
+\end{enumerate}
+
+\begin{table}[H]
+  \centering
+  \caption{Resumen de carga Semana~3 — colecciones \texttt{upme\_solar\_db}}
+  \label{tab:resumen_s3}
+  \begin{tabularx}{\textwidth}{lrrlX}
+    \toprule
+    \textbf{Colección}
+      & \textbf{Docs}
+      & \textbf{CSV (MB)}
+      & \textbf{Índices}
+      & \textbf{Responsable carga} \\
+    \midrule
+    \texttt{ms\_buildings}
+      & 5\,258
+      & 2.1
+      & \texttt{2dsphere}, \texttt{cod\_dane\_municipio}
+      & Juan Pablo \\
+    \texttt{goo\_buildings}
+      & 2\,263\,446
+      & 576
+      & \texttt{2dsphere}, \texttt{cod\_dane\_municipio}, \texttt{confidence}
+      & Jineth \\
+    \midrule
+    \textbf{Total}
+      & \textbf{2\,268\,704}
+      & 578.1
+      & —
+      & — \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
 %% ============================================================
 %%  CAPÍTULO 6 — ENTREGA 4: ANÁLISIS GEOESPACIAL REPRODUCIBLE
@@ -939,14 +1218,99 @@ desafíos de ETL, tiempos, métricas de calidad de datos.]}
 
 \section{Metodología de análisis espacial}
 
-\textit{[Describir el pipeline: consulta de intersección por municipio →
-filtrado por bounding box → intersección poligonal exacta → agregación.
-Diagramar el flujo con un esquema.]}
+El objetivo de esta etapa es estimar, para cada uno de los 170~municipios
+PDET, el número total de huellas de edificaciones y el área acumulada de
+techumbres según cada dataset. El análisis se apoya en los índices
+\texttt{2dsphere} creados en la Semana~3 y sigue un pipeline de cuatro
+pasos encadenados.
+
+\paragraph{Paso~1 — Iteración sobre municipios PDET.}
+Se recorre la colección \texttt{municipios\_pdet} (170~documentos) y se
+extrae, por cada municipio, su campo \texttt{geometry} (polígono GeoJSON
+en WGS-84) y el \textit{bounding box} precalculado (\texttt{bbox}).
+
+\paragraph{Paso~2 — Filtro previo por bounding box.}
+Antes de ejecutar la intersección poligonal exacta —costosa para colecciones
+de millones de documentos— se aplica un filtro rectangular rápido mediante
+\texttt{\$geoWithin} sobre el \texttt{bbox} del municipio.
+Este pre-filtro aprovecha el índice \texttt{2dsphere} y descarta la mayoría
+de las edificaciones fuera del área de interés con mínima carga computacional.
+
+\paragraph{Paso~3 — Intersección poligonal exacta con \texttt{\$geoIntersects}.}
+Sobre el subconjunto resultante del paso anterior se ejecuta la consulta de
+intersección exacta usando el operador \texttt{\$geoIntersects} de MongoDB
+con el polígono completo del municipio como geometría de referencia.
+Esto garantiza que solo se cuenten edificaciones cuya huella toca o está
+contenida dentro del límite oficial del municipio.
+
+\paragraph{Paso~4 — Agregación de métricas.}
+Un \textit{aggregation pipeline} (\texttt{\$match} + \texttt{\$group})
+calcula en una sola pasada el conteo total de edificaciones y la suma de
+\texttt{area\_m2}, produciendo un registro por municipio que se exporta
+a un CSV de resultados.
+
+La Figura~\ref{fig:pipeline_espacial} resume el flujo completo.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+      node distance = 1.2cm,
+      every node/.style = {
+        draw, rounded corners=4pt,
+        minimum width=8.5cm, minimum height=1cm,
+        align=center, font=\small
+      },
+      arrow/.style = {-{Stealth[length=6pt]}, thick},
+      db/.style    = {draw, cylinder, shape border rotate=90,
+                      aspect=0.2, minimum width=3cm,
+                      minimum height=0.9cm, align=center, font=\small\ttfamily},
+    ]
+    %% ── Nodos ──────────────────────────────────────────────────
+    \node (n1) [fill=upmeBlue!10] {
+      \textbf{Paso 1 — Cargar municipios PDET}\\
+      \texttt{municipios\_pdet.find()} → 170 docs\\
+      Extraer \texttt{geometry} + \texttt{bbox} por municipio
+    };
+    \node (n2) [below=of n1, fill=upmeLightBlue!15] {
+      \textbf{Paso 2 — Pre-filtro por bounding box}\\
+      \texttt{\$geoWithin} sobre \texttt{bbox} rectangular\\
+      Índice \texttt{2dsphere} descarta edificaciones externas
+    };
+    \node (n3) [below=of n2, fill=upmeLightBlue!15] {
+      \textbf{Paso 3 — Intersección poligonal exacta}\\
+      \texttt{\$geoIntersects} con polígono del municipio\\
+      Aplicado a \texttt{ms\_buildings} y \texttt{goo\_buildings}
+    };
+    \node (n4) [below=of n3, fill=upmeGreen!15] {
+      \textbf{Paso 4 — Agregación de métricas}\\
+      \texttt{\$group}: \texttt{count} + \texttt{\$sum area\_m2}\\
+      Exportar resultado por municipio a CSV
+    };
+    %% ── Flechas ────────────────────────────────────────────────
+    \draw[arrow] (n1) -- (n2);
+    \draw[arrow] (n2) -- (n3);
+    \draw[arrow] (n3) -- (n4);
+    %% ── Bucle «repetir para cada municipio» ────────────────────
+    \draw[arrow, dashed, upmeGray]
+      (n4.east) -- ++(1.2,0)
+              -- ++(0, 4.2)
+      node[midway, right, draw=none, minimum width=2cm,
+           font=\scriptsize\itshape, text=upmeGray]
+           {repetir\\170 veces}
+      -- (n1.east);
+  \end{tikzpicture}
+  \caption{Pipeline de análisis espacial para estimación de techumbres
+           por municipio PDET.}
+  \label{fig:pipeline_espacial}
+\end{figure}
 
 \subsection{Intersección espacial en NoSQL}
 
-\textit{[Mostrar las queries de intersección, operadores utilizados
-(\texttt{\$geoIntersects}, aggregation pipeline), ejemplo de salida.]}
+\pendiente{Juan Pablo — ampliar el bloque de código existente con:
+descripción de los operadores \texttt{\$geoIntersects} y
+\texttt{\$geoWithin} utilizados, explicación del aggregation pipeline
+completo, tiempo de ejecución por municipio y total, y ejemplo de
+salida real de la query (al menos un municipio con sus cifras).}
 
 \begin{lstlisting}[language=Python,
   caption={Consulta de intersección — Edificaciones Microsoft por municipio}]
@@ -973,8 +1337,12 @@ result = collection_ms.aggregate(pipeline)
 
 \subsection{Reproducibilidad}
 
-\textit{[Describir el entorno Conda/Docker, el archivo de requerimientos
-y las instrucciones de ejecución del pipeline.]}
+\pendiente{Juan Pablo — describir el entorno de ejecución:
+versión de Python y dependencias clave (pymongo, geopandas, shapely,
+pandas), instrucciones para reproducir el pipeline desde cero
+(conexión a MongoDB, orden de ejecución de notebooks),
+y cualquier consideración especial de configuración
+(\texttt{MONGO\_URI}, rutas de datos).}
 
 \section{Resultados por municipio PDET}
 
@@ -993,15 +1361,19 @@ y las instrucciones de ejecución del pipeline.]}
                      & \textbf{Área total (m²)} \\
   \midrule
   \endhead
-  \textit{[Municipio 1]} & & & \\
-  \textit{[Municipio 2]} & & & \\
-  \textit{[\ldots]}      & & & \\
+  \multicolumn{4}{c}{\pendiente{Jineth — llenar con los Top~10 municipios
+    PDET por área total de techumbres según \texttt{ms\_buildings}.
+    Ejecutar aggregation pipeline \texttt{\$geoIntersects} sobre los 170
+    municipios y ordenar por \texttt{area\_total\_m2} descendente.}} \\
   \bottomrule
 \end{longtable}
 
 \subsection{Dataset Google}
 
-\textit{[Tabla equivalente para Google Open Buildings.]}
+\pendiente{Jineth — agregar tabla equivalente (Top~10 municipios PDET por
+área total de techumbres) para \texttt{goo\_buildings}. Usar el mismo
+aggregation pipeline adaptado a Google. Comparar el ranking con Microsoft:
+¿coinciden los municipios top? ¿difieren las magnitudes?}
 
 \section{Visualizaciones}
 
@@ -1009,15 +1381,19 @@ y las instrucciones de ejecución del pipeline.]}
   \centering
   \begin{subfigure}[b]{0.48\textwidth}
     \fbox{\parbox{\textwidth}{\centering\vspace{3cm}
-      \textit{[Mapa coroplético — área total Microsoft]}
-      \vspace{3cm}}}
+      \pendiente{Andrés — mapa coroplético de área total de
+      techumbres por municipio PDET (Microsoft). Usar GeoPandas
+      + Matplotlib o Folium. Exportar como PNG/PDF e incluir aquí.}
+      \vspace{0.5cm}}}
     \caption{Microsoft Building Footprints}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.48\textwidth}
     \fbox{\parbox{\textwidth}{\centering\vspace{3cm}
-      \textit{[Mapa coroplético — área total Google]}
-      \vspace{3cm}}}
+      \pendiente{Andrés — mapa coroplético equivalente para
+      Google Open Buildings. Misma paleta de colores para
+      comparabilidad visual.}
+      \vspace{0.5cm}}}
     \caption{Google Open Buildings}
   \end{subfigure}
   \caption{Área total de techumbres por municipio PDET según cada dataset.}
@@ -1026,13 +1402,21 @@ y las instrucciones de ejecución del pipeline.]}
 
 \section{Comparación entre datasets}
 
-\textit{[Análisis de concordancia: correlación de conteos, diferencias
-sistemáticas por región, posibles explicaciones metodológicas.]}
+\pendiente{Andrés — análisis de concordancia entre Microsoft y Google:
+correlación de Pearson entre conteos por municipio, diferencias
+sistemáticas por región geográfica (Caribe, Pacífico, Amazonia, etc.),
+ratio de cobertura Google/Microsoft por municipio, y posibles
+explicaciones metodológicas (diferente año de imagen, umbral de
+confianza, resolución espacial). Incluir gráfico de dispersión
+conteo MS vs.\ conteo Google por municipio.}
 
 \section{Avance y resultados de la Semana 4}
 
-\textit{[Síntesis del pipeline, validación de resultados, hallazgos
-preliminares más relevantes.]}
+\pendiente{Andrés — síntesis ejecutiva: descripción del pipeline de
+intersección implementado, número de municipios procesados con éxito,
+hallazgo más relevante (ej.\ municipio con mayor potencial de techo),
+y diferencias clave entre datasets. Integrar todo el capítulo en el
+\texttt{.tex} y verificar que compile sin errores.}
 
 %% ============================================================
 %%  CAPÍTULO 7 — ENTREGA 5: INFORME FINAL Y RECOMENDACIONES
